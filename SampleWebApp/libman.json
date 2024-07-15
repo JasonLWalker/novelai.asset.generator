@@ -1,0 +1,58 @@
+{
+  "version": "1.0",
+  "defaultProvider": "cdnjs",
+  "libraries": [
+    {
+      "library": "p5.js@1.9.3",
+      "destination": "wwwroot/lib/p5.js/"
+    },
+    {
+      "library": "pako@2.1.0",
+      "destination": "wwwroot/lib/pako/"
+    },
+    {
+      "provider": "jsdelivr",
+      "library": "msgpackr@1.10.2",
+      "destination": "wwwroot/lib/msgpackr/",
+      "files": [
+        "LICENSE",
+        "README.md",
+        "package.json",
+        "dist/index.js",
+        "dist/index.min.js",
+        "dist/index.min.js.map"
+      ]
+    },
+    {
+      "provider": "jsdelivr",
+      "library": "libsodium-wrappers-sumo@0.7.13",
+      "destination": "wwwroot/lib/libsodium-wrappers-sumo/"
+    },
+    {
+      "provider": "jsdelivr",
+      "library": "libsodium-sumo@0.7.13",
+      "destination": "wwwroot/lib/libsodium-sumo/"
+    },
+    {
+      "library": "bootbox.js@6.0.0",
+      "destination": "wwwroot/lib/bootbox.js/"
+    },
+    {
+      "library": "bootstrap@5.3.3",
+      "destination": "wwwroot/lib/bootstrap/"
+    },
+    {
+      "library": "jquery@3.7.1",
+      "destination": "wwwroot/lib/jquery/"
+    },
+    {
+      "provider": "jsdelivr",
+      "library": "meta-png@1.0.6",
+      "destination": "wwwroot/lib/meta-png/"
+    },
+    {
+      "provider": "unpkg",
+      "library": "@imgly/background-removal-data"
+    }
+  ]
+}

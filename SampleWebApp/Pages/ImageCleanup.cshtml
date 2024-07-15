@@ -1,0 +1,137 @@
+﻿@page
+@model SampleWebApp.Pages.ImageCleanupModel
+@{
+}
+@section Style {
+<style>
+    .checker {
+        background-image: linear-gradient(45deg, #808080 25%, transparent 25%), linear-gradient(-45deg, #808080 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #808080 75%), linear-gradient(-45deg, transparent 75%, #808080 75%);
+        background-size: 20px 20px;
+        background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+    }
+</style>
+}
+<div class="row">
+    <div class="col-4">
+        <div style="min-width:152px; min-height:252px; display:flex; justify-content:center; align-items:center;" class="border">
+            <img id="srcimg" src="resources/loading-spinner.gif" style="max-height:250px;"/>
+        </div>
+    </div>
+    <div class="col">
+        <div class="row">
+            <div class="col">
+                <label>Image Source</label>
+                <select class="image-source form-select">
+                    <option value="/resources/kitten1.png" selected>Playful Kitten</option>
+                    <option value="/resources/kitten2.png">Siamese Kitten</option>
+                    <option value="/resources/kitten3.png">Winking Kitten</option>
+                    <option value="/resources/kitten4.png">Black Kitten</option>
+                    <option value="/resources/cat1.jpg">Standing Cat</option>
+                    <option value="/resources/cat2.png">Seated Cat</option>
+                    <option value="">Custom</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <label>Quality</label>
+                <input type="range" id="quality" min="0" max="1" step="0.1" value="0.8" class="form-range" />
+            </div>
+            <div class="col-auto">
+                <label>Output Type</label>
+                <select id="outputType" class="form-select">
+                    <option value="foreground" selected>Foreground</option>
+                    <option value="background">background</option>
+                    <option value="mask">Mask</option>
+                </select>
+
+            </div>
+            <div class="col-auto">
+                <label>Output Format</label>
+                <select id="outputFormat" class="form-select">
+                    <option value="image/png" selected>PNG</option>
+                    <option value="image/jpeg">JPEG</option>
+                    <option value="image/webp">WEBP</option>
+                </select>
+
+            </div>
+        </div>
+        <button class="btn btn-sm btn-outline-primary btn-remove-background mt-3 w-50">Remove Background</button>
+        <input type="file" id="uploadFile" class="d-none"/>
+    </div>
+</div>
+
+<script type="module">
+    import * as bgLib from 'https://cdn.jsdelivr.net/npm/@@imgly/background-removal@1.5.3/+esm'
+    const public_path = "https://localhost:44392/background-remover/"; // the path assets are served from
+
+    const getBase64StringFromDataURL = (dataURL) => dataURL.replace('data:', '').replace(/^.+,/, '');
+    async function getImageData(srcUrl) {
+        //console.log(srcUrl);
+        const response = await fetch(srcUrl);
+        const blob = await response.blob(); 
+        return blob;
+    }
+
+    async function replaceBackground(blob) {
+        let config = {
+            device: 'gpu',
+            model: 'medium',
+            publicPath: public_path,
+            output: {
+                format: $('#outputFormat').val(),
+                quality: parseFloat($('#quality').val()),
+                type: $('#outputType').val()
+            }
+            //, debug: true
+        };
+        console.log(config);
+        return await bgLib.removeBackground(blob, config);
+    }
+
+    async function onReplaceBackground(e) {
+        const img = document.getElementById('srcimg');
+        const $imgWrapper = $(img).parent();
+        $imgWrapper.removeClass('checker');
+        try {
+            const imgBlob = await getImageData(img.src);
+            img.src = '/resources/loading-spinner.gif';
+            //console.log('Starting background removal');
+            const newBlob = await replaceBackground(imgBlob);
+            //console.log('Background removal complete');
+            $imgWrapper.addClass('checker');
+            img.src = URL.createObjectURL(newBlob);
+        } catch {
+            img.src = "";
+        }
+    }
+
+    $('.btn-remove-background').off().on('click', onReplaceBackground)
+    $('.image-source').off().on('change', async (e) => {
+        const $elem = $(e.delegateTarget);
+        const img = document.getElementById('srcimg');
+        const $imgWrapper = $(img).parent();
+        $imgWrapper.removeClass('checker');
+        let imgSrc = $elem.val();
+        img.src = imgSrc;
+        if (!$elem.val()) {
+            document.getElementById("uploadFile").value = null;
+            $('#uploadFile').trigger('click');
+        }
+    });
+
+    $('#uploadFile').off().on('change', async (e) => {
+        try{
+        const files = e.delegateTarget.files;
+
+        // FileReader support
+        if (FileReader && files && files.length) {
+            var fr = new FileReader();
+            fr.onload = function () {
+                document.getElementById('srcimg').src = fr.result;
+            }
+                fr.readAsDataURL(files[0]);
+            }
+        } catch { }
+    });
+
+    $('.image-source').trigger('change');
+</script>
