@@ -1,0 +1,33 @@
+﻿@page
+@model GenerateCharacterModel
+@{
+}
+@section Scripts
+{
+    <script>
+        window.sodium = {
+            onload: function (sodium) {
+                window.novelApi = new NovelAiApi();
+                function initForm() {
+
+                }
+
+                initLogin(initForm);
+
+                var accessKey = Cookies.get('naiAccessKey') || $('#login input[name=accessKey]').val();
+                var encryptionKey = Cookies.get('naiEncryptionKey') || $('#login input[name=encryptionKey]').val();
+                if (accessKey && encryptionKey) {
+                    $('#login input[name=accessKey]').val(accessKey);
+                    $('#login input[name=encryptionKey]').val(encryptionKey);
+                    $('.btn-login-token').trigger('click');
+                } else {
+                    showLogin(true);
+                }
+
+            }
+        }
+    </script>
+    <script src="~/lib/libsodium-sumo/dist/modules-sumo/libsodium-sumo.min.js"></script>
+    <script src="~/lib/libsodium-wrappers-sumo/dist/modules-sumo/libsodium-wrappers.min.js" async></script>
+
+}
