@@ -1,291 +1,27 @@
 ﻿@page
 @model IndexModel
 @{
-    ViewData["Title"] = "Home page";
 }
-<div class="row d-none" id="login">
-    <div class="col">
-        <form class="needs-validation" novalidate>
-            <label class="form-label">NovelAI Email Address</label>
-            <input type="text" name="username" class="form-control form-control-sm" required />
-            <label class="form-label">NovelAI Password</label>
-            <input type="text" name="password" class="form-control form-control-sm" required />
-            <button type="button" class="btn btn-primary w-100 mt-2 btn-login-username">Login with NovelAI Username and Password</button>
-        </form>
-    </div>
-    <div class="col-auto my-auto px-5">
-        - OR -
-    </div>
-    <div class="col">
-        <label class="form-label">Access Key</label>
-        <input type="text" name="accessKey" class="form-control form-control-sm" />
-        <label class="form-label">Encryption Key</label>
-        <input type="text" name="encryptionKey" class="form-control form-control-sm" />
-        <button type="button" class="btn btn-primary w-100 mt-2 btn-login-token">Login with NovelAI Access and Encryption Keys</button>
-    </div>
-</div>
-<div class="row d-none" id="encryption">
-    <div class="col">
-        <label class="form-label">Access Key</label>
-        <input type="text" name="accessKey" class="form-control form-control-sm" readonly="readonly" />
-    </div>
-    <div class="col">
-        <label class="form-label">Encryption Key</label>
-        <input type="text" name="encryptionKey" class="form-control form-control-sm" readonly="readonly" />
-    </div>
-    <div class="col-auto d-none">
-        <label class="form-label">&nbsp;</label><br />
-        <button class="btn btn-secondary btn-sm btn-export-v1" type="button">Export V1 JSON</button>
-    </div>
-    <div class="col-auto d-none">
-        <label class="form-label">&nbsp;</label><br />
-        <button class="btn btn-secondary btn-sm btn-export-v2" type="button">Export V2 JSON</button>
-    </div>
-</div>
-<div class="row">
-    <input type="hidden" name="storyId" value="" />
-    <div id="content" class="col-12 d-none"></div>
-</div>
 @section Scripts
 {
-    <script src="~/lib/bootbox.js/bootbox.min.js"></script>
-    <script src="~/lib/msgpackr/dist/index.js"></script>
-    <script src="~/lib/pako/pako_inflate.min.js"></script>
-    <script src="~/js/novel-ai-api.js" asp-append-version="true"></script>
-    <script src="~/lib/meta-png/dist/meta-png.umd.js"></script>
     <script>
         window.sodium = {
             onload: function (sodium) {
-                var api = new NovelAiApi();
-                showLoading();
-                initPage();
+                window.novelApi = new NovelAiApi();
+                function initForm() {
 
-                async function loadStoryContent(story) {
-                    showLoading();
-                    var storyData = await api.getUserStoryContent(story['data']['remoteStoryId']);
-                    $('input[name=storyId]').val(story['id']);
-                    var $content = $('#content');
-                    $content.empty();
-                    var $heading = $('<h2></h2>');
-                    $heading.text(story['data']['title']);
-                    $content.append($heading);
-                    var document = storyData['data']['document'];
-                    var order = document['order'];
-                    var sections = document['sections'];
-                    if (document && order && order.length > 0 && sections) {
-                        for (var i = 0; i < order.length; i++) {
-                            var node = document.sections.get(order[i]);
-                            if (node && node.text) {
-                                var $p = $('<p></p>');
-                                $p.text(node.text);
-                                $content.append($p);
-                            }
-                        }
-                    }
-                    $('#encryption .btn').parent().removeClass('d-none');
                 }
 
-                async function loadStory(storyId) {
-                    showLoading();
-                    var storyData = await api.getUserStory(storyId);
-                    var $content = $('#content');
-                    $content.empty();
-                    var $a = $('<a href="#">' + storyData['data']['title'] + '</a>');
-                    var $heading = $('<h2></h2>');
-                    $heading.append($a);
-                    $a.data('story', storyData);
-                    $a.on('click', function (evt) {
-                        var story = $(evt.delegateTarget).data('story');
-                        loadStoryContent(story);
-                        return false;
-                    });
-                    $content.append($heading);
-                    $content.append('<p>' + storyData['data']['textPreview'] + '...</p>')
-                    //console.log(storyData);
-                }
+                initLogin(initForm);
 
-                async function loadStories() {
-                    showLoading();
-                    var stories = await api.getUserStories();
-
-                    var $content = $('#content');
-                    $content.empty();
-                    var $ul = $('<ul></ul>');
-                    $content.append($ul);
-                    for (var key in stories) {
-                        var story = stories[key];
-                        var $li = $('<li></li>');
-                        $ul.append($li);
-                        var $a = $('<a href="#">' + story['data']['title'] + '</a>');
-                        $a.data('story', story);
-                        $a.on('click', function (evt) {
-                            var story = $(evt.delegateTarget).data('story');
-                            loadStory(story['id']);
-                            return false;
-                        });
-                        $li.append($a);
-                    }
-                }
-
-                function showLoading() {
-                    var $content = $('#content');
-                    $content.empty();
-                    $content.append('<p>Loading, please wait...</p>');
-                    $('#encryption .btn').parent().addClass('d-none');
-                }
-
-                // Borrowed from https://stackoverflow.com/questions/10617710/how-to-convert-jpg-image-to-png-using-javascript/76406044#76406044
-                function convertImgToPng(imgUrl, callback) {
-                    var img = new Image();
-
-                    img.onload = function () {
-                        var canvas = document.createElement('canvas');
-                        canvas.width = img.width;
-                        canvas.height = img.height;
-
-                        var ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0);
-
-                        // Convert the image to PNG format
-                        var pngDataUrl = canvas.toDataURL('image/png');
-
-                        // Pass the converted PNG URL to the callback function
-                        callback(pngDataUrl);
-                    };
-
-                    img.src = imgUrl;
-                }
-
-                function downloadJSON(filename, text) {
-                    var element = document.createElement('a');
-                    element.setAttribute('href', 'data:octet/stream;charset=utf-16le;base64,' + btoa(text));
-                    element.setAttribute('download', filename);
-
-                    element.style.display = 'none';
-                    document.body.appendChild(element);
-                    element.click();
-                    document.body.removeChild(element);
-                }
-
-                function downloadFile(filename, text) {
-                    var element = document.createElement('a');
-                    element.setAttribute('href', text);
-                    element.setAttribute('download', filename);
-
-                    element.style.display = 'none';
-                    document.body.appendChild(element);
-                    element.click();
-                    document.body.removeChild(element);
-                }
-
-                function showLogin(show) {
-                    $('.is-invalid').removeClass('is-invalid');
-                    if (show) {
-                        $('#login').removeClass('d-none');
-                        $('#content').addClass('d-none');
-                        $('#encryption').addClass('d-none');
-                    }
-                    else {
-                        $('#login').addClass('d-none');
-                        $('#content').removeClass('d-none');
-                        $('#encryption').removeClass('d-none');
-                    }
-                }
-
-                function initPage() {
-                    $('.btn-login-username, .btn-login-token').off('click').on('click', async function (evt) {
-                        $('.is-invalid').removeClass('is-invalid');
-                        $p = $(evt.delegateTarget).parent();
-                        var username = $('#login input[name=username]').val();
-                        var password = $('#login input[name=password]').val();
-                        var accessKey = $('#login input[name=accessKey]').val();
-                        var encryptionKey = $('#login input[name=encryptionKey]').val();
-                        var keys = {}
-                        if (username && password) {
-                            try {
-                                keys = await api.login(username, password);
-                            } catch {
-                                try {
-                                    keys = await api.login(username.toLowerCase(), password);
-                                } catch {
-                                    // do nothing
-                                }
-                            }
-                        } else if (accessKey && encryptionKey) {
-                            try {
-                                keys = await api.login(accessKey, new Uint8Array(api.decodeBase64(encryptionKey)));
-                            } catch {
-                                // do nothing
-                            }
-                        }
-
-                        if (keys.encryptionKey && keys.accessToken && keys.keystore) {
-                            showLogin(false);
-                            $('#encryption input[name=accessKey]').val(keys['accessKey']);
-                            $('#encryption input[name=encryptionKey]').val(api.encodeBase64(keys['encryptionKey']));
-                            loadStories();
-                        } else {
-                            $('input', $p).addClass('is-invalid');
-                        }
-                    });
-
-                    $('.btn-export-v1').off('click').on('click', async function (evt) {
-                        var data = await api.getCharacterCardV1($('input[name=storyId]').val());
-                        downloadJSON(data['name'] + '.json', JSON.stringify(data));
-                        //console.log(data);
-                    });
-
-                    $('.btn-export-v2').off('click').on('click', async function (evt) {
-                        var data = await api.getCharacterCardV1($('input[name=storyId]').val());
-
-                        bootbox.dialog({
-                            title: 'Please choose an Image to upload',
-                            message: '<input type="file" class="form-control" name="inputFile" />',
-                            buttons: {
-                                ok: {
-                                    label: "OK",
-                                    className: 'btn-primary',
-                                    callback: async function (evt) {
-                                        var $fileInput = $('input[name=inputFile]', $(this));
-                                        var files = ($fileInput[0] || { files: [] }).files;
-                                        if (files.length < 1) {
-                                            bootbox.alert('Please select a file to upload.');
-                                            return false;
-                                        }
-
-                                        var file = files[0];
-                                        let reader = new FileReader();
-                                        reader.onload = async (e) => {
-                                            var b64Img = e.target.result;
-                                            convertImgToPng(b64Img, function (imgPng) {
-                                                var newImg = MetaPNG.addMetadataFromBase64DataURI(imgPng, 'chara', btoa(JSON.stringify(data)));
-                                                downloadFile(data['name'] + '.png', newImg);
-                                            });
-                                        };
-                                        reader.readAsDataURL(file);
-                                    }
-                                },
-                                cancel: {
-                                    label: "Cancel",
-                                    className: 'btn-danger',
-                                    callback: function () { }
-                                }
-
-                            }
-                        });
-                        //console.log(data);
-                    });
-
-                    $('.navbar a[href="/"]').off().on('click', function (evt) {
-                        if (api.keys.keystore) {
-                            loadStories();
-                        } else {
-                            showLogin(true);
-                        }
-                        return false;
-                    })
+                var accessKey = Cookies.get('naiAccessKey') || $('#login input[name=accessKey]').val();
+                var encryptionKey = Cookies.get('naiEncryptionKey') || $('#login input[name=encryptionKey]').val();
+                if (accessKey && encryptionKey) {
+                    $('#login input[name=accessKey]').val(accessKey);
+                    $('#login input[name=encryptionKey]').val(encryptionKey);
+                    $('.btn-login-token').trigger('click');
+                } else {
                     showLogin(true);
-
                 }
 
             }
@@ -293,4 +29,5 @@
     </script>
     <script src="~/lib/libsodium-sumo/dist/modules-sumo/libsodium-sumo.min.js"></script>
     <script src="~/lib/libsodium-wrappers-sumo/dist/modules-sumo/libsodium-wrappers.min.js" async></script>
+
 }

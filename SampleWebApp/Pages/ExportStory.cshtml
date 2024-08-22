@@ -1,0 +1,211 @@
+﻿@page
+@model ExportStoryModel
+@{
+    ViewData["Title"] = "Home page";
+}
+<div class="row">
+    <input type="hidden" name="storyId" value="" />
+    <div id="content" class="col-12 d-none"></div>
+</div>
+@section Scripts
+{
+    <script src="~/lib/meta-png/dist/meta-png.umd.js"></script>
+    <script src="~/lib/bootbox.js/bootbox.min.js"></script>
+    <script>
+        window.sodium = {
+            onload: function (sodium) {
+                window.novelApi = new NovelAiApi();
+
+                showLoading();
+                initPage();
+
+                async function loadStoryContent(story) {
+                    showLoading();
+                    var storyData = await novelApi.getUserStoryContent(story['data']['remoteStoryId']);
+                    $('input[name=storyId]').val(story['id']);
+                    var $content = $('#content');
+                    $content.empty();
+                    var $heading = $('<h2></h2>');
+                    $heading.text(story['data']['title']);
+                    $content.append($heading);
+                    var document = storyData['data']['document'];
+                    var order = document['order'];
+                    var sections = document['sections'];
+                    if (document && order && order.length > 0 && sections) {
+                        for (var i = 0; i < order.length; i++) {
+                            var node = document.sections.get(order[i]);
+                            if (node && node.text) {
+                                var $p = $('<p></p>');
+                                $p.text(node.text);
+                                $content.append($p);
+                            }
+                        }
+                    }
+                    $('#encryption .btn').parent().removeClass('d-none');
+                }
+
+                async function loadStory(storyId) {
+                    showLoading();
+                    var storyData = await novelApi.getUserStory(storyId);
+                    var $content = $('#content');
+                    $content.empty();
+                    var $a = $('<a href="#">' + storyData['data']['title'] + '</a>');
+                    var $heading = $('<h2></h2>');
+                    $heading.append($a);
+                    $a.data('story', storyData);
+                    $a.on('click', function (evt) {
+                        var story = $(evt.delegateTarget).data('story');
+                        loadStoryContent(story);
+                        return false;
+                    });
+                    $content.append($heading);
+                    $content.append('<p>' + storyData['data']['textPreview'] + '...</p>')
+                    //console.log(storyData);
+                }
+
+                async function loadStories() {
+                    showLoading();
+                    var stories = await novelApi.getUserStories();
+
+                    var $content = $('#content');
+                    $content.empty();
+                    var $ul = $('<ul></ul>');
+                    $content.append($ul);
+                    for (var key in stories) {
+                        var story = stories[key];
+                        var $li = $('<li></li>');
+                        $ul.append($li);
+                        var $a = $('<a href="#">' + story['data']['title'] + '</a>');
+                        $a.data('story', story);
+                        $a.on('click', function (evt) {
+                            var story = $(evt.delegateTarget).data('story');
+                            loadStory(story['id']);
+                            return false;
+                        });
+                        $li.append($a);
+                    }
+                }
+
+                // Borrowed from https://stackoverflow.com/questions/10617710/how-to-convert-jpg-image-to-png-using-javascript/76406044#76406044
+                function convertImgToPng(imgUrl, callback) {
+                    var img = new Image();
+
+                    img.onload = function () {
+                        var canvas = document.createElement('canvas');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+
+                        var ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0);
+
+                        // Convert the image to PNG format
+                        var pngDataUrl = canvas.toDataURL('image/png');
+
+                        // Pass the converted PNG URL to the callback function
+                        callback(pngDataUrl);
+                    };
+
+                    img.src = imgUrl;
+                }
+
+                function downloadJSON(filename, text) {
+                    var element = document.createElement('a');
+                    element.setAttribute('href', 'data:octet/stream;charset=utf-16le;base64,' + btoa(text));
+                    element.setAttribute('download', filename);
+
+                    element.style.display = 'none';
+                    document.body.appendChild(element);
+                    element.click();
+                    document.body.removeChild(element);
+                }
+
+                function downloadFile(filename, text) {
+                    var element = document.createElement('a');
+                    element.setAttribute('href', text);
+                    element.setAttribute('download', filename);
+
+                    element.style.display = 'none';
+                    document.body.appendChild(element);
+                    element.click();
+                    document.body.removeChild(element);
+                }
+
+                function initPage() {
+                    initLogin(loadStories);
+
+                    var accessKey = Cookies.get('naiAccessKey') || $('#login input[name=accessKey]').val();
+                    var encryptionKey = Cookies.get('naiEncryptionKey') || $('#login input[name=encryptionKey]').val();
+                    if (accessKey && encryptionKey) {
+                        $('#login input[name=accessKey]').val(accessKey);
+                        $('#login input[name=encryptionKey]').val(encryptionKey);
+                        $('.btn-login-token').trigger('click');
+                    } else {
+                        showLogin(true);
+                    }
+
+
+                    $('.btn-export-v1').off('click').on('click', async function (evt) {
+                        var data = await novelApi.getCharacterCardV1($('input[name=storyId]').val());
+                        downloadJSON(data['name'] + '.json', JSON.stringify(data));
+                        //console.log(data);
+                    });
+
+                    $('.btn-export-v2').off('click').on('click', async function (evt) {
+                        var data = await novelApi.getCharacterCardV1($('input[name=storyId]').val());
+
+                        bootbox.dialog({
+                            title: 'Please choose an Image to upload',
+                            message: '<input type="file" class="form-control" name="inputFile" />',
+                            buttons: {
+                                ok: {
+                                    label: "OK",
+                                    className: 'btn-primary',
+                                    callback: async function (evt) {
+                                        var $fileInput = $('input[name=inputFile]', $(this));
+                                        var files = ($fileInput[0] || { files: [] }).files;
+                                        if (files.length < 1) {
+                                            bootbox.alert('Please select a file to upload.');
+                                            return false;
+                                        }
+
+                                        var file = files[0];
+                                        let reader = new FileReader();
+                                        reader.onload = async (e) => {
+                                            var b64Img = e.target.result;
+                                            convertImgToPng(b64Img, function (imgPng) {
+                                                var newImg = MetaPNG.addMetadataFromBase64DataURI(imgPng, 'chara', btoa(JSON.stringify(data)));
+                                                downloadFile(data['name'] + '.png', newImg);
+                                            });
+                                        };
+                                        reader.readAsDataURL(file);
+                                    }
+                                },
+                                cancel: {
+                                    label: "Cancel",
+                                    className: 'btn-danger',
+                                    callback: function () { }
+                                }
+
+                            }
+                        });
+                        //console.log(data);
+                    });
+                    /*
+                    $('.navbar a[href="/"]').off().on('click', function (evt) {
+                        if (novelApi.keys.keystore) {
+                            loadStories();
+                        } else {
+                            showLogin(true);
+                        }
+                        return false;
+                    })
+                    */
+
+                }
+
+            }
+        }
+    </script>
+    <script src="~/lib/libsodium-sumo/dist/modules-sumo/libsodium-sumo.min.js"></script>
+    <script src="~/lib/libsodium-wrappers-sumo/dist/modules-sumo/libsodium-wrappers.min.js" async></script>
+}
