@@ -46,13 +46,18 @@
       "destination": "wwwroot/lib/jquery/"
     },
     {
+      "library": "js-cookie@3.0.5",
+      "destination": "wwwroot/lib/js-cookie/"
+    },
+    {
       "provider": "jsdelivr",
       "library": "meta-png@1.0.6",
       "destination": "wwwroot/lib/meta-png/"
-    },
+    }
+    /*,
     {
       "provider": "unpkg",
       "library": "@imgly/background-removal-data"
-    }
+    }*/
   ]
 }
