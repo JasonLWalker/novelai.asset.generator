@@ -23,10 +23,16 @@
                             <a class="nav-link text-dark" asp-area="" asp-page="/Index">Home</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-page="/GenerateCharacter">Generate Character</a>
+                            <a class="nav-link text-dark" asp-area="" asp-page="/ExportStory">Export Story</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-dark" asp-area="" asp-page="/GenerateCharacterEmotions">Generate Character Emotions</a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-area="" asp-page="/ImageCleanup">Image Cleanup</a>
+                        </li>
+                        <li class="nav-item ms-auto">
+                            <a class="nav-link text-dark" href="" onclick="naiLogout()">Logout</a>
                         </li>
                     </ul>
                 </div>
@@ -35,6 +41,47 @@
     </header>
     <div class="container">
         <main role="main" class="pb-3">
+            <div class="row d-none" id="login">
+                <div class="col">
+                    <form class="needs-validation" novalidate>
+                        <label class="form-label">NovelAI Email Address</label>
+                        <input type="text" name="username" class="form-control form-control-sm" required />
+                        <label class="form-label">NovelAI Password</label>
+                        <input type="password" name="password" class="form-control form-control-sm" required />
+                        <button type="button" class="btn btn-primary w-100 mt-2 btn-login-username">Login with NovelAI Username and Password</button>
+                    </form>
+                </div>
+                <div class="col-auto my-auto px-5">
+                    - OR -
+                </div>
+                <div class="col">
+                    <label class="form-label">Access Key</label>
+                    <input type="text" name="accessKey" class="form-control form-control-sm" />
+                    <label class="form-label">Encryption Key</label>
+                    <input type="text" name="encryptionKey" class="form-control form-control-sm" />
+                    <button type="button" class="btn btn-primary w-100 mt-2 btn-login-token">Login with NovelAI Access and Encryption Keys</button>
+                </div>
+            </div>
+            <div class="row d-none" id="encryption">
+                <div class="col">
+                    <label class="form-label">Access Key</label>
+                    <input type="text" name="accessKey" class="form-control form-control-sm" readonly="readonly" />
+                </div>
+                <div class="col">
+                    <label class="form-label">Encryption Key</label>
+                    <input type="text" name="encryptionKey" class="form-control form-control-sm" readonly="readonly" />
+                </div>
+                <div class="col-auto d-none">
+                    <label class="form-label">&nbsp;</label><br />
+                    <button class="btn btn-secondary btn-sm btn-export-v1" type="button">Export V1 JSON</button>
+                </div>
+                <div class="col-auto d-none">
+                    <label class="form-label">&nbsp;</label><br />
+                    <button class="btn btn-secondary btn-sm btn-export-v2" type="button">Export V2 JSON</button>
+                </div>
+            </div>
+
+
             @RenderBody()
         </main>
     </div>
@@ -48,7 +95,86 @@
     <script src="~/lib/jquery/jquery.min.js"></script>
     <script src="~/lib/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="~/lib/js-cookie/js.cookie.min.js"></script>
 
+    <script src="~/lib/msgpackr/dist/index.js"></script>
+    <script src="~/lib/pako/pako_inflate.min.js"></script>
+    <script src="~/js/novel-ai-api.js" asp-append-version="true"></script>
+
+    <script>
+        function naiLogout() {
+            Cookies.remove('naiAccessKey');
+            Cookies.remove('naiEncryptionKey');
+            window.location.reload();
+        }
+
+        function showLoading() {
+            var $content = $('#content');
+            $content.empty();
+            $content.append('<p>Loading, please wait...</p>');
+            $('#encryption .btn').parent().addClass('d-none');
+        }
+
+        function showLogin(show) {
+            $('.is-invalid').removeClass('is-invalid');
+
+            if (show) {
+                $('#login').removeClass('d-none');
+                $('#content').addClass('d-none');
+                $('#encryption').addClass('d-none');
+            }
+            else {
+                $('#login').addClass('d-none');
+                $('#content').removeClass('d-none');
+                $('#encryption').removeClass('d-none');
+            }
+        }
+
+        function initLogin(fnCallback) {
+            $('.btn-login-username, .btn-login-token').off('click').on('click', async function (evt) {
+                $('.is-invalid').removeClass('is-invalid');
+                $p = $(evt.delegateTarget).parent();
+                var username = $('#login input[name=username]').val();
+                var password = $('#login input[name=password]').val();
+                var accessKey = $('#login input[name=accessKey]').val();
+                var encryptionKey = $('#login input[name=encryptionKey]').val();
+
+                var keys = {}
+                if (username && password) {
+                    try {
+                        keys = await novelApi.login(username, password);
+                        Cookies.set('naiAccessKey', keys['accessKey'], { expires: 1 })
+                        Cookies.set('naiEncryptionKey', novelApi.encodeBase64(keys['encryptionKey']), { expires: 1 })
+                    } catch {
+                        try {
+                            keys = await novelApi.login(username.toLowerCase(), password);
+                            Cookies.set('naiAccessKey', keys['accessKey'], { expires: 1 })
+                            Cookies.set('naiEncryptionKey', novelApi.encodeBase64(keys['encryptionKey']), { expires: 1 })
+                        } catch {
+                            // do nothing
+                        }
+                    }
+                } else if (accessKey && encryptionKey) {
+                    try {
+                        keys = await novelApi.login(accessKey, new Uint8Array(novelApi.decodeBase64(encryptionKey)));
+                    } catch {
+                        // do nothing
+                    }
+                }
+
+                if (keys.encryptionKey && keys.accessToken && keys.keystore) {
+                    showLogin(false);
+
+                    $('#encryption input[name=accessKey]').val(keys['accessKey']);
+                    $('#encryption input[name=encryptionKey]').val(novelApi.encodeBase64(keys['encryptionKey']));
+                    fnCallback();
+                } else {
+                    showLogin(true);
+                    $('input', $p).addClass('is-invalid');
+                }
+            });
+        }
+    </script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
